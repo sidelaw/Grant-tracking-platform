@@ -1,67 +1,56 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { sql } from "@/lib/db"
-import type { GitHubWebhookPayload } from "@/lib/db"
+import { GitHubWebhookHandler } from "@/lib/services/webhook";
+import crypto from "crypto"
+
+const githubWebhookHandler = new GitHubWebhookHandler();
 
 export async function POST(request: NextRequest) {
   try {
-    const payload: GitHubWebhookPayload = await request.json()
-    const event = request.headers.get("x-github-event")
+    const signature = request.headers.get('x-hub-signature-256') as string;
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
 
-    let activityData = null
+    const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    console.log('GITHUB_WEBHOOK_SECRET:', secret);
+    if (!secret) {
+      console.warn('GITHUB_WEBHOOK_SECRET not set, skipping signature verification');
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+    };
 
-    // Handle different GitHub events
+    const payload = await request.json()
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    if (signature !== `sha256=${expectedSignature}`) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    const event = request.headers.get("x-github-event");
+  
+    const programId = await githubWebhookHandler.getProgramIdByRepository(payload.repository?.full_name);
+    if (!programId) {
+      console.log(`No program found for repository: ${payload.repository?.full_name}`);
+      return NextResponse.json({ message: 'Repository not tracked' }, { status: 200 });
+    }
+
     switch (event) {
-      case "push":
-        if (payload.commits && payload.commits.length > 0) {
-          const commit = payload.commits[0] // Use the first commit
-          activityData = {
-            project_id: 1, // Placeholder - map repo to project later
-            source: "github",
-            type: "commit",
-            content: commit.message,
-            url: commit.url,
-            timestamp: new Date(payload.head_commit?.timestamp || Date.now()),
-          }
-        }
-        break
+    case 'push':
+    await githubWebhookHandler.handlePushEvent(payload, programId);
+    break;
+    case 'pull_request':
+    await githubWebhookHandler.handlePullRequestEvent(payload, programId);
+    break;
+    case 'issues':
+    await githubWebhookHandler.handleIssueEvent(payload, programId);
+    break;
+    default:
+    console.log(`Unhandled GitHub event: ${event}`);
+    } 
 
-      case "pull_request":
-        if (payload.action === "opened" || payload.action === "closed") {
-          activityData = {
-            project_id: 1, // Placeholder - map repo to project later
-            source: "github",
-            type: "pull_request",
-            content: `${payload.action === "opened" ? "Opened" : "Closed"} PR: ${payload.pull_request?.title}`,
-            url: payload.pull_request?.html_url,
-            timestamp: new Date(payload.pull_request?.created_at || Date.now()),
-          }
-        }
-        break
-
-      case "issues":
-        if (payload.action === "opened" || payload.action === "closed") {
-          activityData = {
-            project_id: 1, // Placeholder - map repo to project later
-            source: "github",
-            type: "issue",
-            content: `${payload.action === "opened" ? "Opened" : "Closed"} issue: ${payload.issue?.title}`,
-            url: payload.issue?.html_url,
-            timestamp: new Date(payload.issue?.created_at || Date.now()),
-          }
-        }
-        break
-    }
-
-    // Insert activity log if we have data
-    if (activityData) {
-      await sql`
-        INSERT INTO activity_logs (project_id, source, type, content, url, timestamp)
-        VALUES (${activityData.project_id}, ${activityData.source}, ${activityData.type}, 
-                ${activityData.content}, ${activityData.url}, ${activityData.timestamp})
-      `
-    }
-
-    return NextResponse.json({ success: true, event, processed: !!activityData })
+    return NextResponse.json({ message: 'Webhook processed successfully' }, { status: 200 })
   } catch (error) {
     console.error("GitHub webhook error:", error)
     return NextResponse.json({ error: "Failed to process webhook" }, { status: 500 })
