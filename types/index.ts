@@ -13,18 +13,18 @@ export interface Program {
   github_repo: string; // GitHub repository (owner/repo)
   funds_spent?: number;
   discord_channel_id: string;
-  created_at: Date;
+  created_at: string;
   owner_discord_id: string;
-  updated_at: Date;
-  last_update?: Date;
-  next_update?: Date;
+  updated_at: string;
+  last_upstring?: string;
+  next_upstring?: string;
   avatar_src?: string;
   avatar_bg?: string;
   wallet_address?: string;
   location?: string;
   star_rating?: number; // 1-5
   vp_amount?: string; // Voting Power amount
-  start_date: Date;
+  start_date: string;
   url: string; // Must be unique
 }
 
@@ -39,9 +39,9 @@ export interface Project {
   progress: number; // 0-100
   github_repo?: string;
   funds_spent?: number;
-  created_at: Date;
-  updated_at: Date;
-  start_date?: Date;
+  created_at: string;
+  updated_at: string;
+  start_date?: string;
 }
 
 // Milestone interface (only for milestone_based programs)
@@ -52,15 +52,15 @@ export interface Milestone {
   budget: number;
   funds_spent?: number;
   description?: string;
-  due_date?: Date;
+  due_date?: string;
   status: MilestoneStatus;
   progress: number; // 0-100
-  completion_date?: Date;
-  created_at: Date;
-  updated_at: Date;
+  completion_string?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-// Updated Activity Log interface
+// updated Activity Log interface
 export interface ActivityLog {
   id?: string; // UUID
   program_id: string; // Always required
@@ -70,27 +70,27 @@ export interface ActivityLog {
   type: LogType;
   content: any; // JSONB - flexible content based on type
   url?: string; // Link to PR/commit/Discord msg
-  timestamp: Date;
+  timestamp: string;
   user_github?: string;
   user_discord?: string;
 }
 
-// Updated Review interface
+// updated Review interface
 export interface Review {
   id: string;
   program_id: string; // References programs table now
   reviewer: string;
   review_text?: string;
-  created_at: Date;
+  created_at: string;
 }
 
-// Updated Payout interface
+// updated Payout interface
 export interface Payout {
   id: string;
   program_id: string; // References programs table now
   amount: number; // DECIMAL(10,2)
-  released_at?: Date;
-  created_at: Date;
+  released_at?: string;
+  created_at: string;
 }
 
 // Helper types for better type safety
@@ -99,7 +99,7 @@ export type StatusType = 'active' | 'planning' | 'review' | 'completed' | 'delay
 export type ProgramStatusType = 'At risk' | 'active' | 'paused' | 'completed';
 export type MilestoneStatus = 'pending' | 'completed' | 'delayed';
 export type ActivitySource = 'github' | 'discord' | 'telegram' | 'twitter' | 'manual';
-export type LogType = 'commit' | 'pull_request' | 'issue' | 'announcement' | 'milestone_update' | 'milestone_completed' | 'project_update' | 'general' | 'milestone_progress';
+export type LogType = 'commit' | 'pull_request' | 'issue' | 'announcement' | 'milestone_upstring' | 'milestone_completed' | 'project_upstring' | 'general' | 'milestone_progress';
 
 // GitHub specific interfaces for processing (unchanged)
 export interface GitHubCommitData {
@@ -192,6 +192,47 @@ export type ProgramWithChildren = ProgramWithProjects | ProgramWithMilestones;
 
 export interface RepoActivityCheck {
   isAbandoned: boolean;
-  lastActivityDate: Date | null;
+  lastActivitystring: string | null;
   daysSinceLastActivity: number;
+};
+
+export interface DiscordChannel {
+  id: string;
+  name: string;
+  type: number;
+}
+
+export interface DiscordMember {
+    avatar: string | null;
+    banner: string | null;
+    communication_disabled_until: string | null;
+    flags: number;
+    joined_at: string;
+    nick: string | null;
+    pending: boolean;
+    premium_since: string | null;
+    roles: string[];
+    unusual_dm_activity_until: string | null;
+    collectibles: any;
+    user: {
+        id: string;
+        username: string;
+        avatar: string | null;
+        discriminator: string;
+        public_flags: number;
+        flags: number;
+        bot?: boolean;
+        banner: string | null;
+        accent_color: string | null;
+        global_name: string | null;
+        avatar_decoration_data: any;
+        collectibles: any;
+        display_name_styles: any;
+        banner_color: string | null;
+        clan: string | null;
+        primary_guild: string | null;
+    },
+    mute: boolean;
+    deaf: boolean;
+
 }

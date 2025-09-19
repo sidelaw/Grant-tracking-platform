@@ -20,7 +20,7 @@ export class ActivityLogService {
       type: 'commit',
       content,
       url,
-      timestamp: new Date(commitData.date),
+      timestamp: new Date(commitData.date).toISOString(),
       user_github: commitData.author,
     });
   }
@@ -33,7 +33,7 @@ export class ActivityLogService {
       state: prData.state,
       merged: prData.merged,
       created_at: prData.created_at,
-      updated_at: prData.updated_at,
+      updated_at: new Date().toISOString(),
       merged_at: prData.merged_at,
       repository: prData.repository
     };
@@ -46,7 +46,7 @@ export class ActivityLogService {
       type: 'pull_request',
       content,
       url,
-      timestamp: new Date(prData.created_at),
+      timestamp: prData.created_at,
       user_github: prData.author,
     });
   }
@@ -59,7 +59,7 @@ export class ActivityLogService {
       state: issueData.state,
       labels: issueData.labels,
       created_at: issueData.created_at,
-      updated_at: issueData.updated_at,
+      updated_at: new Date().toISOString(),
       closed_at: issueData.closed_at,
       repository: issueData.repository
     };
@@ -71,7 +71,7 @@ export class ActivityLogService {
       source: 'github',
       type: 'issue',
       content,
-      timestamp: new Date(issueData.created_at),
+      timestamp: issueData.created_at,
       user_github: issueData.author,
     });
   }
@@ -83,7 +83,7 @@ export class ActivityLogService {
     messageId: string, 
     authorId: string, 
     channelId: string,
-    timestamp: Date,
+    timestamp: string,
     milestoneId?: string,
     projectId?: string
   ): Promise<void> {
@@ -110,7 +110,7 @@ export class ActivityLogService {
   async createManualLog(
     programId: string,
     type: string,
-    content: any,
+    content: string,
     milestoneId?: string,
     projectId?: string,
     userGithub?: string,
@@ -121,7 +121,7 @@ export class ActivityLogService {
       source: 'manual',
       type: type as ActivityLog['type'],
       content,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       user_github: userGithub,
       user_discord: userDiscord,
       milestone_id: milestoneId || "",

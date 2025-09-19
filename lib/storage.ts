@@ -14,7 +14,100 @@ export function createClient() {
 const supabase = createClient();
 
 class SupabaseDatabase {
-  
+  async getTotalProgramsCount(){
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('id', { count: 'exact' })
+      if (error) throw error;
+      return data?.length || 0;
+    } catch (error) {
+      console.error('Error fetching total programs:', error);
+      throw error;
+    }
+  }
+  async getTotalFundsSpent(){
+    try {
+        const { data, error } = await supabase
+        .from('programs')
+        .select('funds_spent');
+      if (error) throw error;
+      return data?.reduce((total, program) => total + (program.funds_spent || 0), 0) || 0;
+    } catch (error) {
+      console.error('Error fetching total funds spent:', error);
+      throw error;
+    }
+  }
+  async getTotalBudget(){
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('budget');
+      if (error) throw error;
+      return data?.reduce((total, program) => total + (program.budget || 0), 0) || 0;
+    } catch (error) {
+      console.error('Error fetching total budget:', error);
+      throw error;
+    }
+  }
+  async getTotalActiveProgramsCount(){
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('id', { count: 'exact' })
+        .eq('status', 'active');
+      if (error) throw error;
+      return data?.length || 0;
+    } catch (error) {
+      console.error('Error fetching total active programs:', error);
+      throw error;
+      
+    }
+  }
+
+  async getDelayedProgramsCount(){
+    // program start_date + duration to get end date and compare with current date
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('id, name, start_date, duration, status')
+      if (error) throw error;
+      const now = new Date();
+      return data?.filter(project => {
+        if (project.start_date && project.duration) {
+          const startDate = new Date(project.start_date);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + project.duration);
+          return endDate < now;
+        }
+        return false;
+      }) || [];
+    } catch (error) {
+      console.error('Error fetching delayed programs:', error);
+      throw error;
+    }
+  };
+  async getAtRiskProgramsCount(){
+    // programs that are not updated in the last 30 days
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('id, name, updated_at, status')
+      if (error) throw error;
+      const now = new Date();
+      return data?.filter(project => {
+        if (project.updated_at) {
+          const updatedAt = new Date(project.updated_at);
+          const diffDays = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays > 30;
+        }
+        return false;
+      }) || [];
+    } catch (error) {
+      console.error('Error fetching at-risk programs:', error);
+      throw error;
+    }
+  }
   async createActivityLog(data: ActivityLog): Promise<void> {
     try {
       const activityData = { ...data, timestamp: new Date().toISOString(), created_at: new Date().toISOString() };
@@ -29,7 +122,7 @@ class SupabaseDatabase {
     }
   }
 
-  async   getProgramActivities(
+  async  getProgramActivities(
     programId: string, 
     options: {
       source?: 'github' | 'discord' | 'manual';
@@ -113,6 +206,69 @@ class SupabaseDatabase {
       return data || [];
     } catch (error) {
       console.error('Error fetching most recent activities:', error);
+      throw error;
+    }
+  }
+  
+
+    async mergeActivitiesToMilestones(): Promise<any[]> {
+      try {
+          const { data: activities, error: activitiesError } = await supabase
+            .from('activity_logs')
+            .select('*')
+            .order('timestamp', { ascending: false });
+          if (activitiesError) throw activitiesError;
+          const mergedActivities = await Promise.all(activities.map(async (activity) => {
+            if (activity.milestone_id) {
+               const { data: milestone, error: milestoneError } = await supabase
+                .from('milestones')
+                .select('title')
+                .eq('id', activity.milestone_id)
+                .single();
+                 if (milestoneError) throw milestoneError;
+                return {
+                  ...activity,
+                  parent_title: milestone?.title || null,
+                  title:  this.extractActivityContentMessage(activity.source, activity.content)
+                }
+            }
+               
+          }));
+          return mergedActivities;
+         
+      } catch (error) {
+        console.error('Error merging activities to milestones:', error);
+        throw error;
+      }
+    }
+ extractActivityContentMessage(activityType: 'manual' | 'github' | 'discord', content: any): string {
+    if (activityType === 'manual') {
+      return typeof content === 'string' ? content : '';
+    }
+    else if (activityType === 'github') {
+      return content.message || '';
+    }
+    else if (activityType === 'discord') {
+      return content.content || '';
+    }
+    return '';
+  }
+  async searchPrograms(queryStr: string): Promise<Program[]> {
+    try {
+      const { data, error } = await supabase
+
+        .from('programs')
+        .select('*')
+        .ilike('name', `%${queryStr}%`)
+        .ilike('grantee', `%${queryStr}%`)
+        .ilike('category', `%${queryStr}%`)
+        .or(`ilike(description, '%${queryStr}%'), ilike(github_repo, '%${queryStr}%')`)
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error searching programs:', error);
       throw error;
     }
   }

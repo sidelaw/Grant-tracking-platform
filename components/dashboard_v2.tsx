@@ -19,100 +19,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Eye, Edit, Trash2, Calendar, DollarSign, Users, GitBranch } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Project, Milestone, Program, DiscordChannel, DiscordMember
+ } from '../types';
 
-interface Program {
-  id: string;
-  name: string;
-  description?: string;
-  type: 'project_based' | 'milestone_based';
-  grantee: string;
-  grantee_email: string;
-  category: string;
-  budget: number;
-  duration: number;
-  status: 'At risk' | 'active' | 'paused' | 'completed';
-  progress: number;
-  github_repo: string;
-  funds_spent?: number;
-  discord_channel_id: string;
-  owner_discord_id: string;
-  start_date: string;
-  url: string;
-  location?: string;
-  star_rating?: number;
-}
-
-interface Milestone {
-  id: string;
-  program_id: string;
-  title: string;
-  description?: string;
-  budget: number;
-  funds_spent?: number;
-  due_date?: string;
-  status: 'pending' | 'completed' | 'delayed';
-  progress: number;
-}
-
-interface Project {
-  id: string;
-  program_id: string;
-  name: string;
-  description?: string;
-  budget?: number;
-  status: 'paused' | 'active' | 'planning' | 'review' | 'completed' | 'delayed';
-  progress: number;
-  github_repo?: string;
-  funds_spent?: number;
-  start_date?: string;
-  end_date?: string;
-  url?: string;
-}
-
-interface DiscordChannel {
-  id: string;
-  name: string;
-  type: number;
-}
-
-interface DiscordMember {
-    avatar: string | null;
-    banner: string | null;
-    communication_disabled_until: string | null;
-    flags: number;
-    joined_at: string;
-    nick: string | null;
-    pending: boolean;
-    premium_since: string | null;
-    roles: string[];
-    unusual_dm_activity_until: string | null;
-    collectibles: any;
-    user: {
-        id: string;
-        username: string;
-        avatar: string | null;
-        discriminator: string;
-        public_flags: number;
-        flags: number;
-        bot?: boolean;
-        banner: string | null;
-        accent_color: string | null;
-        global_name: string | null;
-        avatar_decoration_data: any;
-        collectibles: any;
-        display_name_styles: any;
-        banner_color: string | null;
-        clan: string | null;
-        primary_guild: string | null;
-    },
-    mute: boolean;
-    deaf: boolean;
-
-}
 
 export default function ProgramManagementV2() {
   const [programs, setPrograms] = useState<Program[]>([]);
-
   const [discordChannels, setDiscordChannels] = useState<DiscordChannel[]>([]);
   const [discordMembers, setDiscordMembers] = useState<DiscordMember[]>([]);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
@@ -122,19 +34,49 @@ export default function ProgramManagementV2() {
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const guildId = process.env.NEXT_PUBLIC_DISCORD_GUILD_ID || '';
-  
+  const [stats, setStats] = useState<{
+    programCount: number;
+    activeProgramCount: number;
+    delayedProgramCount: number;
+    totalFundsSpent: number;
+    totalBudget: number;
+    totalAtRisk: number;
+  } | null>(null);
 
-  // Mock data for demonstration
   useEffect(() => {
     // Load Discord channels and members on component mount
     if (guildId) {
       fetchDiscordChannels();
       fetchDiscordMembers();
       fetchPrograms();
+      fetchStats();
+      fetchRecentActivity();
     }
   }, []);
-
+  const fetchRecentActivity = async () => {
+    try {
+        const response = await fetch('/api/activities/recent');
+        if(response.ok){
+            const data = await response.json();
+            setRecentActivity(data);
+        }
+    } catch (error) {
+        console.error('Failed to fetch recent activity:', error);
+    }
+  }
+ const fetchStats = async () => {
+  try {
+    const response = await fetch('/api/stats');
+    if (response.ok) {
+      const data = await response.json();
+      setStats(data);
+    }
+  } catch (error) {
+    console.error('Failed to fetch program stats:', error);
+  }
+ }
   const fetchDiscordChannels = async () => {
     if (!guildId) return;
     
@@ -333,7 +275,7 @@ export default function ProgramManagementV2() {
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
-        <ScrollArea className="h-96 pr-4">
+        <ScrollArea className="h-[60vh] pr-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div className="space-y-2">
               <Label htmlFor="name">Program Name *</Label>
@@ -488,12 +430,12 @@ export default function ProgramManagementV2() {
                   </SelectContent>
                 </Select>
                 
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                   <Input
                     placeholder="New channel name"
                     value={newChannelName}
                     onChange={(e) => setNewChannelName(e.target.value)}
-                    className="flex-1"
+                    className=""
                   />
                   <Button
                     type="button"
@@ -509,7 +451,7 @@ export default function ProgramManagementV2() {
                   >
                     {isCreatingChannel ? 'Creating...' : 'Create'}
                   </Button>
-                </div>
+                </div> */}
                 <p className="text-xs text-gray-500">
                   Select an existing channel or create a new one
                 </p>
@@ -607,7 +549,7 @@ export default function ProgramManagementV2() {
                       </div>
                     )}
 
-                    {formData.type === 'milestone_based' && (
+                    {formData && formData.type === 'milestone_based' && (
                       <div className="space-y-2">
                         <Label>Due Date</Label>
                         <Input
@@ -646,7 +588,7 @@ export default function ProgramManagementV2() {
                       setChildItems(updated);
                     }}
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
+                    <Trash2 className="w-4 h-4 mr-2"/>
                     Remove
                   </Button>
                 </CardContent>
@@ -674,17 +616,18 @@ export default function ProgramManagementV2() {
     const programMilestones = milestones.filter(m => m.program_id === program.id);
     const programChannel = discordChannels.find(c => c.id === program.discord_channel_id);
     const programOwner = discordMembers.find(m => m.user.id === program.owner_discord_id);
+  
     React.useEffect(()=>{
-         const fetchProgramChildren = async ( type: 'project_based' | 'milestone_based') => {
+         const fetchProgramChildren = async ( ) => {
     try {
-        const url = type === 'project_based' ? `/api/programs/${program.id}/projects` : `/api/programs/${program.id}/milestones`;
+        const url = program.type === 'project_based' ? `/api/programs/${program.id}/projects` : `/api/programs/${program.id}/milestones`;
         const response = await fetch(url);
         if(!response.ok){
-            console.error(`Failed to fetch ${type === 'project_based' ? 'projects' : 'milestones'}:`, response.statusText);
+            console.error(`Failed to fetch ${program.type === 'project_based' ? 'projects' : 'milestones'}:`, response.statusText);
             return;
         }
          const data = await response.json();
-        if (type === 'project_based') {
+        if (program.type === 'project_based') {
             setProjects((prev) => {
                 const existingProjectIds = new Set(prev.map(p => p.id));
                 
@@ -702,8 +645,8 @@ export default function ProgramManagementV2() {
         return;
     }
   }
-  
-    },[])
+  fetchProgramChildren();
+    },[]);
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1034,7 +977,7 @@ export default function ProgramManagementV2() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Programs</p>
-                <p className="text-2xl font-bold">{programs.length}</p>
+                <p className="text-2xl font-bold">{stats?.programCount}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-full">
                 <DollarSign className="w-6 h-6 text-blue-600" />
@@ -1049,7 +992,9 @@ export default function ProgramManagementV2() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Programs</p>
                 <p className="text-2xl font-bold">
-                  {programs.filter(p => p.status === 'active').length}
+                  {
+                    stats?.activeProgramCount
+                  }
                 </p>
               </div>
               <div className="p-3 bg-green-100 rounded-full">
@@ -1065,7 +1010,7 @@ export default function ProgramManagementV2() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Budget</p>
                 <p className="text-2xl font-bold">
-                  ${programs.reduce((sum, p) => sum + p.budget, 0).toLocaleString()}
+                  ${stats?.totalBudget.toLocaleString()}
                 </p>
               </div>
               <div className="p-3 bg-yellow-100 rounded-full">
@@ -1081,7 +1026,7 @@ export default function ProgramManagementV2() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Funds Spent</p>
                 <p className="text-2xl font-bold">
-                  ${programs.reduce((sum, p) => sum + (p.funds_spent || 0), 0).toLocaleString()}
+                  ${stats?.totalFundsSpent.toLocaleString()}
                 </p>
               </div>
               <div className="p-3 bg-red-100 rounded-full">
@@ -1100,6 +1045,22 @@ export default function ProgramManagementV2() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {
+                recentActivity?.map((activity, index) => (
+                  <div key={index} className="flex items-center gap-3 pb-3 border-b last:border-0">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity?.parent_title}</p>
+                      {activity?.title && (
+                        <p className="text-xs text-gray-500">{activity?.title}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {new Date(activity?.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))
+              }
               <div className="flex items-center gap-3 pb-3 border-b">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <div className="flex-1">
